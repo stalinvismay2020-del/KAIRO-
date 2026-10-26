@@ -81,6 +81,81 @@ func _ready() -> void:
 	_load_progress()
 	_build_lobby()
 	_update_hud()
+	_build_founder_intro()
+
+
+func _build_founder_intro() -> void:
+	# Founder-only cinematic intro: no roster or extra characters appear here.
+	lobby_layer.visible = false
+	var intro := CanvasLayer.new()
+	intro.layer = 30
+	add_child(intro)
+	var backdrop := ColorRect.new()
+	backdrop.anchor_right = 1.0
+	backdrop.anchor_bottom = 1.0
+	backdrop.color = Color(0.008, 0.012, 0.035, 1.0)
+	intro.add_child(backdrop)
+	var center := CenterContainer.new()
+	center.anchor_right = 1.0
+	center.anchor_bottom = 1.0
+	center.offset_left = 16
+	center.offset_right = -16
+	intro.add_child(center)
+	var stack := VBoxContainer.new()
+	stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_theme_constant_override("separation", 14)
+	center.add_child(stack)
+	var aura := Label.new()
+	aura.text = "◉"
+	aura.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	aura.add_theme_font_size_override("font_size", 94)
+	aura.add_theme_color_override("font_color", Color(0.2, 0.68, 1.0, 0.95))
+	stack.add_child(aura)
+	var title := Label.new()
+	title.text = "ECLIPSE STRIKERS"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 29)
+	title.add_theme_color_override("font_color", Color(0.35, 0.82, 1.0))
+	stack.add_child(title)
+	var line := ColorRect.new()
+	line.custom_minimum_size = Vector2(180, 3)
+	line.color = Color(0.85, 0.12, 0.28, 0.95)
+	stack.add_child(line)
+	var founder := Label.new()
+	founder.text = "FOUNDER\nSTALIN VISMAY"
+	founder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	founder.add_theme_font_size_override("font_size", 23)
+	founder.add_theme_color_override("font_color", Color(1.0, 0.94, 0.9))
+	stack.add_child(founder)
+	var identity := Label.new()
+	identity.text = "KING OF KINGS  •  INNOCENT ZERO"
+	identity.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	identity.add_theme_font_size_override("font_size", 13)
+	identity.add_theme_color_override("font_color", Color(0.72, 0.78, 0.92))
+	stack.add_child(identity)
+	var skip := Button.new()
+	skip.text = "ENTER THE ARENA  ▶"
+	skip.custom_minimum_size = Vector2(210, 44)
+	skip.add_theme_color_override("font_color", Color.WHITE)
+	skip.add_theme_stylebox_override("normal", _panel_style(Color(0.04, 0.22, 0.42), Color(0.2, 0.68, 1.0)))
+	stack.add_child(skip)
+	var finish_intro := func() -> void:
+		if is_instance_valid(intro):
+			var fade := create_tween()
+			fade.tween_property(intro, "modulate:a", 0.0, 0.35)
+			fade.tween_callback(func() -> void:
+				if is_instance_valid(intro):
+					intro.queue_free()
+				if is_instance_valid(lobby_layer):
+					lobby_layer.visible = true
+			)
+	skip.pressed.connect(finish_intro)
+	var pulse := create_tween().set_loops()
+	pulse.tween_property(aura, "scale", Vector2(1.13, 1.13), 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	pulse.tween_property(aura, "scale", Vector2.ONE, 0.65).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var reveal := create_tween()
+	reveal.tween_interval(4.5)
+	reveal.tween_callback(finish_intro)
 
 func _process(delta: float) -> void:
 	_update_aim_guide()
