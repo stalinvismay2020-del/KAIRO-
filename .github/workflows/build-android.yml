@@ -42,10 +42,13 @@ jobs:
           echo "$HOME/godot" >> "$GITHUB_PATH"
 
       - name: Install Android build template
-        run: Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --install-android-build-template --quit
+        run: |
+          Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --install-android-build-template
+          echo "Checking project Android build template..."
+          test -f android/build/build.gradle || (echo "Android build template was not installed into the project." && find android -maxdepth 3 -type f -print 2>/dev/null || true; exit 1)
 
       - name: Verify project parses
-        run: Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit
+        run: Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --quit
 
       - name: Export Android APK
         env:
