@@ -75,6 +75,13 @@ jobs:
             echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey"
             echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android"
           } >> "$GITHUB_ENV"
+          # Set Android signing values in Godot's editor settings; environment
+          # variables alone are not reliably read by all Godot 4.3 export builds.
+          cat >> "$HOME/.config/godot/editor_settings-4.tres" <<EOF
+          export/android/keystore/debug = "$RUNNER_TEMP/eclipse-strikers-debug.keystore"
+          export/android/keystore/debug_user = "androiddebugkey"
+          export/android/keystore/debug_password = "android"
+          EOF
 
       - name: Export Android APK
         env:
