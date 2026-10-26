@@ -605,6 +605,13 @@ func _move_ball(_delta: float) -> void:
 		var p := ball.global_position
 		p.y = BALL_RADIUS
 		ball.global_position = p
+		# Small, damped rebound so the ball visibly bounces instead of sticking to the turf.
+		if ball.linear_velocity.y < -0.9:
+			ball.linear_velocity.y = -ball.linear_velocity.y * 0.38
+			ball.linear_velocity.x *= 0.94
+			ball.linear_velocity.z *= 0.94
+		else:
+			ball.linear_velocity.y = 0.0
 	if absf(ball.global_position.z) > FIELD_WIDTH / 2.0 - 0.4:
 		ball.linear_velocity.z *= -0.65
 		ball.global_position.z = clampf(ball.global_position.z, -FIELD_WIDTH / 2.0 + 0.5, FIELD_WIDTH / 2.0 - 0.5)
