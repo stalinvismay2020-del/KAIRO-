@@ -218,7 +218,7 @@ func _build_pitch() -> void:
 			_mesh_box(self, Vector3(FIELD_LENGTH + 10, 0.48, 1.25), Vector3(0, 0.25 + tier * 0.48, side * (FIELD_WIDTH / 2.0 + 1.8 + tier * 0.92)), seat_mat)
 	# Proper penalty areas, six-yard boxes and penalty spots.
 	for end in [-1.0, 1.0]:
-		var box_x := end * (FIELD_LENGTH / 2.0 - 4.0)
+		var box_x: float = float(end) * (FIELD_LENGTH / 2.0 - 4.0)
 		_mesh_box(self, Vector3(0.07, 0.025, 15.0), Vector3(box_x, -0.018, 0), white)
 		_mesh_box(self, Vector3(6.0, 0.025, 0.07), Vector3(end * (FIELD_LENGTH / 2.0 - 7.0), -0.018, -7.5), white)
 		_mesh_box(self, Vector3(6.0, 0.025, 0.07), Vector3(end * (FIELD_LENGTH / 2.0 - 7.0), -0.018, 7.5), white)
@@ -239,7 +239,7 @@ func _build_pitch() -> void:
 		for z in [-FIELD_WIDTH / 2.0 - 6.0, FIELD_WIDTH / 2.0 + 6.0]:
 			_mesh_box(self, Vector3(0.22, 8.0, 0.22), Vector3(x, 4.0, z), _material(Color(0.12, 0.16, 0.23), 0.35))
 			var lamp := _mesh_box(self, Vector3(1.6, 0.22, 0.65), Vector3(x, 8.0, z), glow)
-			lamp.cast_shadow = false
+			lamp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 func _build_goals() -> void:
 	var goal_mat := _material(Color(0.93, 0.96, 1.0), 0.4)
@@ -291,7 +291,7 @@ func _make_player(team_home: bool, pos: Vector3, is_user := false) -> CharacterB
 	hair.material_override = _material(Color(0.035, 0.045, 0.075) if team_home else Color(0.16, 0.035, 0.045), 0.4)
 	body.add_child(hair)
 	var eye_band := _mesh_box(body, Vector3(0.29, 0.045, 0.035), Vector3(0, 1.96, 0.245), trim_mat)
-	eye_band.cast_shadow = false
+	eye_band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var limb_mat := _material(Color(0.055, 0.075, 0.12) if team_home else Color(0.16, 0.035, 0.045), 0.55)
 	var leg_nodes: Array[MeshInstance3D] = []
 	for leg_name in ["LeftLeg", "RightLeg"]:
