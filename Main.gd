@@ -862,13 +862,16 @@ func _build_lobby() -> void:
 	stack.add_theme_constant_override("separation", 7)
 	margin.add_child(stack)
 	var title := Label.new()
-	title.text = "FREESTYLE ARENA"
+	title.text = "ECLIPSE STRIKERS"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", 27)
 	title.add_theme_color_override("font_color", Color(0.25, 0.82, 1.0))
+	var title_tween := create_tween().set_loops()
+	title_tween.tween_property(title, "scale", Vector2(1.035, 1.035), 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	title_tween.tween_property(title, "scale", Vector2.ONE, 0.9).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	stack.add_child(title)
 	var subtitle := Label.new()
-	subtitle.text = "ANIME FOOTBALL • 4v4"
+	subtitle.text = "FOUNDER’S ARENA  •  4v4 ANIME FOOTBALL"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	subtitle.add_theme_font_size_override("font_size", 13)
 	subtitle.add_theme_color_override("font_color", Color(0.8, 0.88, 1.0))
