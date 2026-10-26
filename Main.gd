@@ -62,6 +62,9 @@ var sfx_player: AudioStreamPlayer
 var goal_animation_busy := false
 var goal_banner_tween: Tween
 var sound_enabled := true
+var ultimate_cooldown := 0.0
+var ultimate_button: Button
+var ultimate_fx_timer := 0.0
 
 func _ready() -> void:
 	rng.randomize()
@@ -95,6 +98,10 @@ func _process(delta: float) -> void:
 		burst_time = maxf(0.0, burst_time - delta)
 	if burst_cooldown > 0.0:
 		burst_cooldown = maxf(0.0, burst_cooldown - delta)
+	if ultimate_cooldown > 0.0:
+		ultimate_cooldown = maxf(0.0, ultimate_cooldown - delta)
+	if ultimate_button:
+		ultimate_button.text = "ULTIMATE" if ultimate_cooldown <= 0.0 else "ULT " + str(int(ceil(ultimate_cooldown))) + "s"
 	if player_visual and player:
 		var moving := Vector2(player.velocity.x, player.velocity.z).length() > 0.5
 		run_phase += delta * (12.0 if moving else 3.0)
@@ -437,6 +444,9 @@ func _build_ui() -> void:
 	pass_button.pressed.connect(_pass_ball)
 	burst_button = _make_button(layer, "BURST", Vector2(-128, -62), Color(0.45,0.2,0.8))
 	burst_button.pressed.connect(_burst)
+	ultimate_button = _make_button(layer, "ULTIMATE", Vector2(-238, -155), Color(0.06, 0.72, 0.92))
+	ultimate_button.size = Vector2(112, 58)
+	ultimate_button.pressed.connect(_use_ultimate)
 	var restart := _make_button(layer, "RESTART", Vector2(18, -55), Color(0.08,0.45,0.24))
 	restart.anchor_left = 0.5
 	restart.anchor_right = 0.5
@@ -652,6 +662,50 @@ func _pass_ball() -> void:
 	_spawn_skill_burst(ball.global_position, Color(0.15, 0.65, 1.0))
 	ui_hint.text = "◆ PERFECT PASS ◆"
 
+
+func _use_ultimate() -> void:
+	if not match_active:
+		ui_hint.text = "Start a match before using your ultimate"
+		return
+	if selected_character != "Eclipse Ace":
+		ui_hint.text = "Select ECLIPSE ACE in the lobby to unlock the ultimate"
+		return
+	if ultimate_cooldown > 0.0:
+		ui_hint.text = "ECLIPSE BREAKER recharging..."
+		return
+	if not _near_ball():
+		ui_hint.text = "Get close to the ball to unleash ECLIPSE BREAKER"
+		return
+	ultimate_cooldown = 32.0
+	kick_anim_time = 0.46
+	_play_sfx("ultimate")
+	_spawn_skill_burst(player.global_position + Vector3(0, 0.5, 0), Color(0.25, 0.05, 0.95))
+	_spawn_skill_burst(ball.global_position, Color(0.05, 0.9, 1.0))
+	# Original anime-style finisher: high precision toward the goal with a small
+	# controlled miss chance so the move is powerful but not an automatic score.
+	var goal_x := FIELD_LENGTH / 2.0 + 2.0
+	var in_range := player.global_position.x > 2.0
+	var target_z := clampf(-player.global_position.z * 0.32, -2.15, 2.15)
+	if in_range and rng.randf() > 0.80:
+		target_z = 3.5 if rng.randf() > 0.5 else -3.5
+	var target := Vector3(goal_x, 0.7, target_z)
+	var dir := (target - ball.global_position).normalized()
+	dir.y = 0.035
+	ball.linear_velocity = Vector3.ZERO
+	ball.apply_central_impulse(dir.normalized() * 22.0)
+	ui_hint.text = "ECLIPSE BREAKER!! • 80% TARGET ACCURACY IN RANGE"
+	if goal_banner:
+		if goal_banner_tween and goal_banner_tween.is_running():
+			goal_banner_tween.kill()
+		goal_banner.text = "ECLIPSE BREAKER"
+		goal_banner.scale = Vector2(0.45, 0.45)
+		goal_banner.modulate.a = 1.0
+		goal_banner.add_theme_color_override("font_color", Color(0.25, 0.9, 1.0))
+		goal_banner_tween = create_tween()
+		goal_banner_tween.set_parallel(true)
+		goal_banner_tween.tween_property(goal_banner, "scale", Vector2(1.15, 1.15), 0.24).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		goal_banner_tween.tween_property(goal_banner, "modulate:a", 0.0, 1.25).set_delay(0.65)
+
 func _burst() -> void:
 	if selected_ability != "Speed Burst":
 		ui_hint.text = "POWER SHOT selected — use SHOOT" if selected_ability == "Power Shot" else "PRECISION PASS selected — use PASS"
@@ -774,7 +828,7 @@ func _build_lobby() -> void:
 	stack.add_child(subtitle)
 	stack.add_child(_lobby_label("CHARACTER"))
 	character_picker = OptionButton.new()
-	for item in ["Striker", "Playmaker", "Defender"]:
+	for item in ["Striker", "Playmaker", "Defender", "Eclipse Ace"]:
 		character_picker.add_item(item)
 	stack.add_child(character_picker)
 	stack.add_child(_lobby_label("SPECIAL ABILITY"))
@@ -844,6 +898,7 @@ func _start_match() -> void:
 	match selected_character:
 		"Playmaker": ui_hint.text = "PLAYMAKER • PRECISION AND TEAMWORK"
 		"Defender": ui_hint.text = "DEFENDER • HOLD YOUR LINE"
+		"Eclipse Ace": ui_hint.text = "ECLIPSE ACE • ULTIMATE: ECLIPSE BREAKER"
 		_: ui_hint.text = "STRIKER • GO FOR GOALS"
 	match_active = true
 	time_left = MATCH_SECONDS
@@ -851,6 +906,7 @@ func _start_match() -> void:
 	score_away = 0
 	burst_time = 0.0
 	burst_cooldown = 0.0
+	ultimate_cooldown = 0.0
 	_reset_kickoff("KICK OFF! • " + selected_ability.to_upper())
 	lobby_layer.visible = false
 	_update_hud()
@@ -974,6 +1030,9 @@ func _play_sfx(kind: String) -> void:
 		"burst":
 			duration = 0.28
 			base_freq = 620.0
+		"ultimate":
+			duration = 1.05
+			base_freq = 330.0
 	var count := int(rate * duration)
 	var bytes := PackedByteArray()
 	bytes.resize(count * 2)
@@ -981,16 +1040,18 @@ func _play_sfx(kind: String) -> void:
 		var t := float(i) / rate
 		var envelope := 1.0 - float(i) / count
 		var freq := base_freq
-		if kind == "goal":
+		if kind == "goal" or kind == "ultimate":
 			freq = base_freq * (1.0 + 0.35 * sin(t * 9.0))
 		elif kind == "kick":
 			freq = base_freq * (1.0 - 0.55 * t / duration)
 		elif kind == "burst":
 			freq = base_freq * (0.7 + 1.1 * t / duration)
+		elif kind == "ultimate":
+			freq = base_freq * (0.8 + 1.4 * t / duration)
 		var wave := sin(TAU * freq * t) * envelope
 		if kind == "kick":
 			wave = (wave * 0.65 + sin(TAU * 55.0 * t) * envelope * 0.35)
-		elif kind == "goal":
+		elif kind == "goal" or kind == "ultimate":
 			wave = (wave * 0.7 + sin(TAU * base_freq * 1.5 * t) * envelope * 0.3)
 		var sample := int(clampf(wave * 12500.0, -32767.0, 32767.0))
 		bytes.encode_s16(i * 2, sample)
