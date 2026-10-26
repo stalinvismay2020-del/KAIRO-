@@ -71,7 +71,7 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
         run: |
           mkdir -p build
-          Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug "Android" build/FootballRivals-debug.apk
+          Godot_v4.3-stable_linux.x86_64 --verbose --headless --path . --export-debug "Android" build/FootballRivals-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
