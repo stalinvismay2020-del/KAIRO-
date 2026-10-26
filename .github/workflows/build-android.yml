@@ -41,6 +41,9 @@ jobs:
           chmod +x "$HOME/godot/Godot_v4.3-stable_linux.x86_64"
           echo "$HOME/godot" >> "$GITHUB_PATH"
 
+      - name: Install Android build template
+        run: Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --install-android-build-template --quit
+
       - name: Verify project parses
         run: Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit
 
