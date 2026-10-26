@@ -48,6 +48,12 @@ var selected_team_color := "Electric Blue"
 var wins_total := 0
 var goals_total := 0
 var player_level := 1
+var aim_line: MeshInstance3D
+var goal_banner: Label
+var sfx_player: AudioStreamPlayer
+var goal_animation_busy := false
+var goal_banner_tween: Tween
+var sound_enabled := true
 
 func _ready() -> void:
 	rng.randomize()
@@ -63,6 +69,7 @@ func _ready() -> void:
 	_update_hud()
 
 func _process(delta: float) -> void:
+	_update_aim_guide()
 	if match_active:
 		time_left = maxf(0.0, time_left - delta)
 		if time_left <= 0.0:
@@ -386,6 +393,38 @@ func _build_ui() -> void:
 	lobby_button.position = Vector2(8, 0)
 	lobby_button.size = Vector2(112, 44)
 	lobby_button.pressed.connect(_return_to_lobby)
+	goal_banner = Label.new()
+	goal_banner.anchor_left = 0.15
+	goal_banner.anchor_right = 0.85
+	goal_banner.anchor_top = 0.31
+	goal_banner.anchor_bottom = 0.49
+	goal_banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	goal_banner.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	goal_banner.add_theme_font_size_override("font_size", 36)
+	goal_banner.add_theme_color_override("font_color", Color(1.0, 0.88, 0.28))
+	goal_banner.add_theme_color_override("font_shadow_color", Color(0.02, 0.04, 0.1, 1.0))
+	goal_banner.add_theme_constant_override("shadow_offset_x", 3)
+	goal_banner.add_theme_constant_override("shadow_offset_y", 4)
+	goal_banner.text = ""
+	goal_banner.modulate.a = 0.0
+	goal_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(goal_banner)
+	sfx_player = AudioStreamPlayer.new()
+	sfx_player.name = "ProceduralSFX"
+	sfx_player.volume_db = -7.0
+	add_child(sfx_player)
+	var aim_material := StandardMaterial3D.new()
+	aim_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	aim_material.albedo_color = Color(0.15, 0.95, 1.0, 0.9)
+	aim_material.emission_enabled = true
+	aim_material.emission = Color(0.05, 0.7, 1.0)
+	aim_material.emission_energy_multiplier = 1.8
+	var aim_mesh := ImmediateMesh.new()
+	aim_line = MeshInstance3D.new()
+	aim_line.name = "ShotTrajectoryGuide"
+	aim_line.mesh = aim_mesh
+	aim_line.material_override = aim_material
+	add_child(aim_line)
 	goal_flash = ColorRect.new()
 	goal_flash.anchor_right = 1.0
 	goal_flash.anchor_bottom = 1.0
@@ -518,13 +557,15 @@ func _shoot() -> void:
 	if not match_active or not _near_ball():
 		ui_hint.text = "Get closer to the ball to shoot"
 		return
-	var dir := Vector3(1, 0.15, 0) + Vector3(0, 0, -player.global_position.z * 0.02)
+	var goal_target := Vector3(FIELD_LENGTH / 2.0 + 2.0, 1.0, clampf(-player.global_position.z * 0.45, -2.35, 2.35))
+	var dir := (goal_target - ball.global_position).normalized()
 	var shot_power := 13.0
 	if selected_ability == "Power Shot":
 		shot_power = 18.0
-	ball.apply_central_impulse(dir.normalized() * shot_power)
+	ball.apply_central_impulse(dir * shot_power)
+	_play_sfx("kick")
 	_spawn_skill_burst(ball.global_position, Color(1.0, 0.25, 0.12))
-	ui_hint.text = "⚡ POWER SHOT! ⚡"
+	ui_hint.text = "⚡ DIRECT SHOT! ⚡"
 
 func _pass_ball() -> void:
 	if not match_active or not _near_ball():
@@ -537,6 +578,7 @@ func _pass_ball() -> void:
 	if selected_ability == "Precision Pass":
 		pass_power = 11.0
 	ball.apply_central_impulse(dir.normalized() * pass_power)
+	_play_sfx("pass")
 	_spawn_skill_burst(ball.global_position, Color(0.15, 0.65, 1.0))
 	ui_hint.text = "◆ PERFECT PASS ◆"
 
@@ -549,6 +591,7 @@ func _burst() -> void:
 		return
 	burst_time = 1.6
 	burst_cooldown = 5.0
+	_play_sfx("burst")
 	burst_fx_timer = 0.0
 	_spawn_skill_burst(player.global_position, Color(0.15, 0.75, 1.0))
 	ui_hint.text = "⚡ ANIME BURST! ⚡"
@@ -571,6 +614,9 @@ func _reset_ball() -> void:
 
 func _reset_kickoff(message: String) -> void:
 	ui_hint.text = message
+	if message.contains("SCORES") or message.contains("GOAL"):
+		_show_goal_celebration(message)
+		_play_sfx("goal")
 	if goal_flash:
 		goal_flash.color = Color(0.12, 0.95, 1.0, 0.28) if message.contains("GOAL") or message.contains("SCORES") else Color(0.1, 0.9, 1.0, 0.0)
 		goal_flash_time = 0.35 if message.contains("GOAL") or message.contains("SCORES") else 0.0
@@ -793,3 +839,95 @@ func _spawn_skill_burst(at: Vector3, tint: Color) -> void:
 	tween.tween_property(mat, "albedo_color", Color(tint.r, tint.g, tint.b, 0.0), 0.42)
 	tween.tween_property(fx, "position:y", at.y + 0.65, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tween.chain().tween_callback(fx.queue_free)
+
+
+func _update_aim_guide() -> void:
+	if not is_instance_valid(aim_line) or not is_instance_valid(ball) or not is_instance_valid(player):
+		return
+	var show_guide := match_active and _near_ball()
+	aim_line.visible = show_guide
+	if not show_guide:
+		return
+	var mesh := aim_line.mesh as ImmediateMesh
+	mesh.clear_surfaces()
+	mesh.surface_begin(Mesh.PRIMITIVE_LINE_STRIP)
+	var origin := ball.global_position + Vector3(0, 0.12, 0)
+	var target_z := clampf(-player.global_position.z * 0.45, -2.35, 2.35)
+	var target := Vector3(FIELD_LENGTH / 2.0 + 2.0, 1.0, target_z)
+	var dir := (target - origin).normalized()
+	var power := 13.0 if selected_ability != "Power Shot" else 18.0
+	var velocity := dir * power * 0.72
+	var point := origin
+	mesh.surface_add_vertex(to_local(point))
+	for i in range(1, 22):
+		var t := float(i) * 0.11
+		point = origin + velocity * t + Vector3(0, -4.9 * t * t, 0)
+		mesh.surface_add_vertex(to_local(point))
+	mesh.surface_end()
+
+func _show_goal_celebration(message: String) -> void:
+	if not is_instance_valid(goal_banner):
+		return
+	if goal_banner_tween and goal_banner_tween.is_running():
+		goal_banner_tween.kill()
+	var home_goal := message.contains("BLUE")
+	goal_banner.text = "GOAL!!" if home_goal else "THEY SCORED!"
+	if home_goal:
+		goal_banner.text += "\n"THAT'S THE STRIKER'S INSTINCT!""
+	else:
+		goal_banner.text += "\n"RESET. WE'RE NOT DONE YET.""
+	goal_banner.scale = Vector2(0.55, 0.55)
+	goal_banner.modulate.a = 1.0
+	goal_animation_busy = true
+	goal_banner_tween = create_tween()
+	goal_banner_tween.set_parallel(true)
+	goal_banner_tween.tween_property(goal_banner, "scale", Vector2(1.0, 1.0), 0.28).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	goal_banner_tween.tween_property(goal_banner, "modulate:a", 0.0, 2.4).set_delay(1.5)
+	goal_banner_tween.chain().tween_callback(func(): goal_animation_busy = false)
+
+func _play_sfx(kind: String) -> void:
+	if not sound_enabled or not is_instance_valid(sfx_player):
+		return
+	var rate := 22050
+	var duration := 0.24
+	var base_freq := 180.0
+	match kind:
+		"goal":
+			duration = 0.9
+			base_freq = 440.0
+		"kick":
+			duration = 0.13
+			base_freq = 115.0
+		"pass":
+			duration = 0.16
+			base_freq = 260.0
+		"burst":
+			duration = 0.28
+			base_freq = 620.0
+	var count := int(rate * duration)
+	var bytes := PackedByteArray()
+	bytes.resize(count * 2)
+	for i in range(count):
+		var t := float(i) / rate
+		var envelope := 1.0 - float(i) / count
+		var freq := base_freq
+		if kind == "goal":
+			freq = base_freq * (1.0 + 0.35 * sin(t * 9.0))
+		elif kind == "kick":
+			freq = base_freq * (1.0 - 0.55 * t / duration)
+		elif kind == "burst":
+			freq = base_freq * (0.7 + 1.1 * t / duration)
+		var wave := sin(TAU * freq * t) * envelope
+		if kind == "kick":
+			wave = (wave * 0.65 + sin(TAU * 55.0 * t) * envelope * 0.35)
+		elif kind == "goal":
+			wave = (wave * 0.7 + sin(TAU * base_freq * 1.5 * t) * envelope * 0.3)
+		var sample := int(clampf(wave * 12500.0, -32767.0, 32767.0))
+		bytes.encode_s16(i * 2, sample)
+	var stream := AudioStreamWAV.new()
+	stream.format = AudioStreamWAV.FORMAT_16_BITS
+	stream.mix_rate = rate
+	stream.stereo = false
+	stream.data = bytes
+	sfx_player.stream = stream
+	sfx_player.play()
