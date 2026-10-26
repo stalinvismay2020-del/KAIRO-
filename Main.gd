@@ -408,8 +408,7 @@ func _move_ball(_delta: float) -> void:
 		ball.global_position = p
 	if absf(ball.global_position.z) > FIELD_WIDTH / 2.0 - 0.4:
 		ball.linear_velocity.z *= -0.65
-		ball.global_position.z = clampf(ball.global_position.z, -FIELD_WIDTH / 2.0 + 0.5, FIELD_WIDTH / 2.0 - 0.5
-	)
+		ball.global_position.z = clampf(ball.global_position.z, -FIELD_WIDTH / 2.0 + 0.5, FIELD_WIDTH / 2.0 - 0.5)
 	ball.linear_velocity.x = clampf(ball.linear_velocity.x, -18.0, 18.0)
 	ball.linear_velocity.z = clampf(ball.linear_velocity.z, -14.0, 14.0)
 
