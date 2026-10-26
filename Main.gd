@@ -32,6 +32,11 @@ var burst_button: Button
 var camera_rig: Node3D
 var camera: Camera3D
 var rng := RandomNumberGenerator.new()
+var player_visual: MeshInstance3D
+var goal_flash: ColorRect
+var goal_flash_time := 0.0
+var burst_fx_timer := 0.0
+var run_phase := 0.0
 
 func _ready() -> void:
 	rng.randomize()
@@ -55,6 +60,21 @@ func _process(delta: float) -> void:
 		burst_time = maxf(0.0, burst_time - delta)
 	if burst_cooldown > 0.0:
 		burst_cooldown = maxf(0.0, burst_cooldown - delta)
+	if player_visual and player:
+		var moving := Vector2(player.velocity.x, player.velocity.z).length() > 0.5
+		run_phase += delta * (12.0 if moving else 3.0)
+		player_visual.position.y = 0.95 + (absf(sin(run_phase)) * 0.10 if moving else 0.0)
+		player_visual.rotation.z = sin(run_phase * 0.5) * 0.06 if moving else lerpf(player_visual.rotation.z, 0.0, delta * 5.0)
+	if burst_time > 0.0 and player:
+		burst_fx_timer -= delta
+		if burst_fx_timer <= 0.0:
+			burst_fx_timer = 0.12
+			_spawn_skill_burst(player.global_position + Vector3(0, 0.12, 0), Color(0.15, 0.75, 1.0))
+	if goal_flash_time > 0.0 and goal_flash:
+		goal_flash_time = maxf(0.0, goal_flash_time - delta)
+		var flash_color := goal_flash.color
+		flash_color.a = clampf(goal_flash_time * 1.8, 0.0, 0.28)
+		goal_flash.color = flash_color
 	if camera_rig and player:
 		var target := player.global_position
 		camera_rig.global_position = camera_rig.global_position.lerp(target, minf(1.0, delta * 5.0))
@@ -156,6 +176,8 @@ func _make_player(team_home: bool, pos: Vector3, is_user := false) -> CharacterB
 	mesh.position.y = 0.95
 	mesh.material_override = _material(Color(0.08, 0.36, 0.95) if team_home else Color(0.92, 0.15, 0.12), 0.45)
 	body.add_child(mesh)
+	if is_user:
+		player_visual = mesh
 	var head := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
 	sphere.radius = 0.27
@@ -293,6 +315,12 @@ func _build_ui() -> void:
 	restart.position = Vector2(-65, 0)
 	restart.size = Vector2(130, 44)
 	restart.pressed.connect(_restart)
+	goal_flash = ColorRect.new()
+	goal_flash.anchor_right = 1.0
+	goal_flash.anchor_bottom = 1.0
+	goal_flash.color = Color(0.1, 0.9, 1.0, 0.0)
+	goal_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(goal_flash)
 
 func _panel_style(bg: Color, border_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -421,7 +449,8 @@ func _shoot() -> void:
 		return
 	var dir := Vector3(1, 0.15, 0) + Vector3(0, 0, -player.global_position.z * 0.02)
 	ball.apply_central_impulse(dir.normalized() * 13.0)
-	ui_hint.text = "POWER SHOT!"
+	_spawn_skill_burst(ball.global_position, Color(1.0, 0.25, 0.12))
+	ui_hint.text = "⚡ POWER SHOT! ⚡"
 
 func _pass_ball() -> void:
 	if not match_active or not _near_ball():
@@ -431,7 +460,8 @@ func _pass_ball() -> void:
 	var dir := (target - ball.global_position).normalized()
 	dir.y = 0.05
 	ball.apply_central_impulse(dir.normalized() * 7.5)
-	ui_hint.text = "PASS!"
+	_spawn_skill_burst(ball.global_position, Color(0.15, 0.65, 1.0))
+	ui_hint.text = "◆ PERFECT PASS ◆"
 
 func _burst() -> void:
 	if burst_cooldown > 0.0:
@@ -439,7 +469,9 @@ func _burst() -> void:
 		return
 	burst_time = 1.6
 	burst_cooldown = 5.0
-	ui_hint.text = "SPEED BURST!"
+	burst_fx_timer = 0.0
+	_spawn_skill_burst(player.global_position, Color(0.15, 0.75, 1.0))
+	ui_hint.text = "⚡ ANIME BURST! ⚡"
 
 func _check_goals() -> void:
 	if ball.global_position.x > FIELD_LENGTH / 2.0 + 0.5 and absf(ball.global_position.z) < 3.1:
@@ -458,6 +490,11 @@ func _reset_ball() -> void:
 
 func _reset_kickoff(message: String) -> void:
 	ui_hint.text = message
+	if goal_flash:
+		goal_flash.color = Color(0.12, 0.95, 1.0, 0.28) if message.contains("GOAL") or message.contains("SCORES") else Color(0.1, 0.9, 1.0, 0.0)
+		goal_flash_time = 0.35 if message.contains("GOAL") or message.contains("SCORES") else 0.0
+	if message.contains("GOAL") or message.contains("SCORES"):
+		_spawn_skill_burst(Vector3(FIELD_LENGTH / 2.0 if message.contains("BLUE") else -FIELD_LENGTH / 2.0, 0.2, 0), Color(1.0, 0.85, 0.2))
 	_reset_ball()
 	player.global_position = Vector3(-12,0,0)
 	var starts_home := [Vector3(-7,0,-7), Vector3(-1,0,7), Vector3(-9,0,1)]
@@ -485,3 +522,28 @@ func _update_hud() -> void:
 	ui_timer.text = "   %02d:%02d" % [total / 60, total % 60]
 	if burst_button:
 		burst_button.text = "BURST" if burst_cooldown <= 0.0 else str(int(ceil(burst_cooldown))) + "s"
+
+
+func _spawn_skill_burst(at: Vector3, tint: Color) -> void:
+	# Lightweight procedural anime impact ring: no external art assets required.
+	var fx := MeshInstance3D.new()
+	var ring := TorusMesh.new()
+	ring.inner_radius = 0.42
+	ring.outer_radius = 0.58
+	fx.mesh = ring
+	fx.global_position = at
+	fx.scale = Vector3.ONE * 0.22
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(tint.r, tint.g, tint.b, 0.82)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.emission_enabled = true
+	mat.emission = tint
+	mat.emission_energy_multiplier = 1.8
+	fx.material_override = mat
+	add_child(fx)
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(fx, "scale", Vector3.ONE * 2.8, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.tween_property(mat, "albedo_color", Color(tint.r, tint.g, tint.b, 0.0), 0.42)
+	tween.tween_property(fx, "position:y", at.y + 0.65, 0.42).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tween.chain().tween_callback(fx.queue_free)
