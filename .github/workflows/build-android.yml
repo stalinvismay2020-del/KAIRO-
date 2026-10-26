@@ -46,11 +46,11 @@ jobs:
           set -eux
           TEMPLATE="$HOME/.local/share/godot/export_templates/4.3.stable/android_source.zip"
           test -f "$TEMPLATE"
-          mkdir -p android
-          unzip -q -o "$TEMPLATE" -d android
+          mkdir -p android/build
+          unzip -q -o "$TEMPLATE" -d android/build
           echo "Checking project Android build template..."
           find android -maxdepth 3 -type f | head -80
-          test -f android/build.gradle
+          test -f android/build/build.gradle
 
       - name: Verify project parses
         run: Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --quit
