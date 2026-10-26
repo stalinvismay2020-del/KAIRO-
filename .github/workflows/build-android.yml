@@ -1,0 +1,38 @@
+name: Build Football Rivals APK
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '**.gd'
+      - '**.tscn'
+      - '**.godot'
+      - 'export_presets.cfg'
+      - '.github/workflows/build-android.yml'
+
+jobs:
+  android:
+    name: Export Android debug APK
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.3.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare export directory
+        run: mkdir -p build
+
+      - name: Verify project parses
+        run: godot --headless --path . --editor --quit
+
+      - name: Export Android APK
+        run: godot --headless --path . --export-debug "Android" build/FootballRivals-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: football-rivals-debug-apk
+          path: build/FootballRivals-debug.apk
+          if-no-files-found: error
+          retention-days: 14
