@@ -1,4 +1,4 @@
-name: Build Football Rivals APK
+name: Build Eclipse Strikers APK
 
 on:
   workflow_dispatch:
@@ -71,12 +71,12 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
         run: |
           mkdir -p build
-          Godot_v4.3-stable_linux.x86_64 --verbose --headless --path . --export-debug "Android" build/FootballRivals-debug.apk
+          Godot_v4.3-stable_linux.x86_64 --verbose --headless --path . --export-debug "Android" build/EclipseStrikers-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: football-rivals-debug-apk
-          path: build/FootballRivals-debug.apk
+          name: eclipse-strikers-debug-apk
+          path: build/EclipseStrikers-debug.apk
           if-no-files-found: error
           retention-days: 14
