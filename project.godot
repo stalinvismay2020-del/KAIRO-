@@ -1,10 +1,10 @@
 config_version=5
 
 [application]
-config/name="Football Rivals"
+config/name="Eclipse Strikers"
 run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
-config/description="Offline third-person 4v4 football game prototype"
+config/description="Eclipse Strikers — offline anime-style third-person 4v4 football"
 
 [display]
 window/size/viewport_width=1280
