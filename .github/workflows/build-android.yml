@@ -63,6 +63,19 @@ jobs:
       - name: Verify project parses
         run: Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --quit
 
+      - name: Generate CI debug keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$RUNNER_TEMP/eclipse-strikers-debug.keystore" \
+            -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          {
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/eclipse-strikers-debug.keystore"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey"
+            echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android"
+          } >> "$GITHUB_ENV"
+
       - name: Export Android APK
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
