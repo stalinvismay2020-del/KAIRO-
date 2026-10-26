@@ -13,21 +13,44 @@ on:
 jobs:
   android:
     name: Export Android debug APK
-    runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.3.0
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Prepare export directory
-        run: mkdir -p build
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and build tools
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Download Godot 4.3 and export templates
+        run: |
+          mkdir -p "$HOME/godot" "$HOME/.local/share/godot/export_templates/4.3.stable"
+          curl -L --fail --retry 3 "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_linux.x86_64.zip" -o "$HOME/godot/godot.zip"
+          unzip -q "$HOME/godot/godot.zip" -d "$HOME/godot"
+          curl -L --fail --retry 3 "https://github.com/godotengine/godot/releases/download/4.3-stable/Godot_v4.3-stable_export_templates.tpz" -o "$HOME/godot/templates.tpz"
+          unzip -q "$HOME/godot/templates.tpz" -d "$HOME/godot/templates"
+          cp -a "$HOME/godot/templates/templates/." "$HOME/.local/share/godot/export_templates/4.3.stable/"
+          chmod +x "$HOME/godot/Godot_v4.3-stable_linux.x86_64"
+          echo "$HOME/godot" >> "$GITHUB_PATH"
 
       - name: Verify project parses
-        run: godot --headless --path . --editor --quit
+        run: Godot_v4.3-stable_linux.x86_64 --headless --path . --editor --quit
 
       - name: Export Android APK
-        run: godot --headless --path . --export-debug "Android" build/FootballRivals-debug.apk
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_HOME }}
+        run: |
+          mkdir -p build
+          Godot_v4.3-stable_linux.x86_64 --headless --path . --export-debug "Android" build/FootballRivals-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
