@@ -27,7 +27,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0 cmdline-tools;latest cmake;3.10.2.4988404 ndk;23.2.8568313'
           accept-android-sdk-licenses: true
 
       - name: Configure Godot Android SDK paths
