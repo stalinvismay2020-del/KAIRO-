@@ -336,7 +336,7 @@ func _input(event: InputEvent) -> void:
 			joystick_touch_id = -1
 			joystick_vector = Vector2.ZERO
 	elif event is InputEventScreenDrag and event.index == joystick_touch_id:
-		var d := event.position - touch_origin
+		var d: Vector2 = event.position - touch_origin
 		joystick_vector = Vector2(clampf(d.x / 52.0, -1.0, 1.0), clampf(d.y / 52.0, -1.0, 1.0))
 	elif event is InputEventMouseButton:
 		if event.pressed and event.position.x < get_viewport().get_visible_rect().size.x * 0.45 and event.position.y > get_viewport().get_visible_rect().size.y * 0.55:
@@ -346,7 +346,7 @@ func _input(event: InputEvent) -> void:
 			joystick_touch_id = -1
 			joystick_vector = Vector2.ZERO
 	elif event is InputEventMouseMotion and joystick_touch_id == 999:
-		var d := event.position - touch_origin
+		var d: Vector2 = event.position - touch_origin
 		joystick_vector = Vector2(clampf(d.x / 52.0, -1.0, 1.0), clampf(d.y / 52.0, -1.0, 1.0))
 
 func _move_user(delta: float) -> void:
