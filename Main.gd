@@ -16,6 +16,7 @@ var score_home := 0
 var score_away := 0
 var time_left := MATCH_SECONDS
 var match_active := false
+var is_paused := false
 var joystick_vector := Vector2.ZERO
 var touch_origin := Vector2.ZERO
 var joystick_touch_id := -1
@@ -64,6 +65,8 @@ var goal_banner_tween: Tween
 var sound_enabled := true
 var ultimate_cooldown := 0.0
 var ultimate_button: Button
+var pause_button: Button
+var sound_button: Button
 var ultimate_fx_timer := 0.0
 
 func _ready() -> void:
@@ -81,7 +84,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_update_aim_guide()
-	if match_active:
+	if match_active and not is_paused:
 		time_left = maxf(0.0, time_left - delta)
 		if time_left <= 0.0:
 			match_active = false
@@ -147,6 +150,8 @@ func _process(delta: float) -> void:
 			joystick_knob.position = Vector2(42, 42) + offset
 
 func _physics_process(delta: float) -> void:
+	if is_paused:
+		return
 	if not match_active:
 		_move_ball(delta)
 		return
@@ -501,7 +506,46 @@ func _build_ui() -> void:
 	goal_flash.color = Color(0.1, 0.9, 1.0, 0.0)
 	goal_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(goal_flash)
+	# Compact top-corner controls keep pause and sound accessible on phones.
+	pause_button = Button.new()
+	pause_button.text = "PAUSE"
+	pause_button.anchor_left = 1.0
+	pause_button.anchor_right = 1.0
+	pause_button.anchor_top = 0.025
+	pause_button.anchor_bottom = 0.025
+	pause_button.position = Vector2(-108, 0)
+	pause_button.size = Vector2(92, 38)
+	pause_button.add_theme_font_size_override("font_size", 14)
+	pause_button.pressed.connect(_toggle_pause)
+	layer.add_child(pause_button)
+	sound_button = Button.new()
+	sound_button.text = "SFX ON"
+	sound_button.anchor_left = 1.0
+	sound_button.anchor_right = 1.0
+	sound_button.anchor_top = 0.025
+	sound_button.anchor_bottom = 0.025
+	sound_button.position = Vector2(-208, 0)
+	sound_button.size = Vector2(88, 38)
+	sound_button.add_theme_font_size_override("font_size", 14)
+	sound_button.pressed.connect(_toggle_sound)
+	layer.add_child(sound_button)
 	goal_banner.move_to_front()
+
+func _toggle_pause() -> void:
+	if not match_active:
+		ui_hint.text = "Start a match before pausing"
+		return
+	is_paused = not is_paused
+	joystick_vector = Vector2.ZERO
+	if pause_button:
+		pause_button.text = "RESUME" if is_paused else "PAUSE"
+	ui_hint.text = "MATCH PAUSED" if is_paused else "MATCH RESUMED"
+
+func _toggle_sound() -> void:
+	sound_enabled = not sound_enabled
+	if sound_button:
+		sound_button.text = "SFX ON" if sound_enabled else "SFX OFF"
+	ui_hint.text = "Sound effects enabled" if sound_enabled else "Sound effects muted"
 
 func _panel_style(bg: Color, border_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -757,6 +801,9 @@ func _reset_kickoff(message: String) -> void:
 	_update_hud()
 
 func _restart() -> void:
+	is_paused = false
+	if pause_button:
+		pause_button.text = "PAUSE"
 	score_home = 0
 	score_away = 0
 	time_left = MATCH_SECONDS
@@ -879,6 +926,9 @@ func _lobby_label(value: String) -> Label:
 
 
 func _start_match() -> void:
+	is_paused = false
+	if pause_button:
+		pause_button.text = "PAUSE"
 	selected_character = character_picker.get_item_text(character_picker.selected)
 	selected_ability = ability_picker.get_item_text(ability_picker.selected)
 	selected_team_color = color_picker.get_item_text(color_picker.selected)
@@ -913,6 +963,7 @@ func _start_match() -> void:
 
 
 func _return_to_lobby() -> void:
+	is_paused = false
 	match_active = false
 	joystick_vector = Vector2.ZERO
 	lobby_layer.visible = true
