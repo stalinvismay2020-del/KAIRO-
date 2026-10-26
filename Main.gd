@@ -33,6 +33,14 @@ var camera_rig: Node3D
 var camera: Camera3D
 var rng := RandomNumberGenerator.new()
 var player_visual: MeshInstance3D
+var ball_visual: MeshInstance3D
+var kick_anim_time := 0.0
+var kick_anim_leg: Node3D
+var player_left_leg: Node3D
+var player_right_leg: Node3D
+var player_left_arm: Node3D
+var player_right_arm: Node3D
+var ball_bounce_phase := 0.0
 var goal_flash: ColorRect
 var goal_flash_time := 0.0
 var burst_fx_timer := 0.0
@@ -92,6 +100,27 @@ func _process(delta: float) -> void:
 		run_phase += delta * (12.0 if moving else 3.0)
 		player_visual.position.y = 0.95 + (absf(sin(run_phase)) * 0.10 if moving else 0.0)
 		player_visual.rotation.z = sin(run_phase * 0.5) * 0.06 if moving else lerpf(player_visual.rotation.z, 0.0, delta * 5.0)
+		if player_left_leg and player_right_leg and kick_anim_time <= 0.0:
+			var stride := sin(run_phase) * (0.55 if moving else 0.035)
+			player_left_leg.rotation.x = stride
+			player_right_leg.rotation.x = -stride
+			if player_left_arm and player_right_arm:
+				player_left_arm.rotation.x = -stride * 0.65
+				player_right_arm.rotation.x = stride * 0.65
+	if kick_anim_time > 0.0:
+		kick_anim_time = maxf(0.0, kick_anim_time - delta)
+		if kick_anim_leg:
+			var progress := 1.0 - kick_anim_time / 0.34
+			kick_anim_leg.rotation.x = -1.15 * sin(progress * PI) if progress < 1.0 else 0.0
+		if player_visual:
+			player_visual.rotation.z = sin((1.0 - kick_anim_time / 0.34) * PI) * -0.16
+	if is_instance_valid(ball_visual) and is_instance_valid(ball):
+		var speed_spin := ball.linear_velocity.length()
+		ball_visual.rotate_x(delta * speed_spin * 0.65)
+		ball_visual.rotate_z(delta * speed_spin * 0.45)
+		var ground_dist := maxf(0.0, ball.global_position.y - BALL_RADIUS)
+		ball_visual.position.y = 0.0
+		ball_visual.scale = Vector3.ONE * (1.0 + minf(0.08, ground_dist * 0.06))
 	if burst_time > 0.0 and player:
 		burst_fx_timer -= delta
 		if burst_fx_timer <= 0.0:
@@ -256,6 +285,35 @@ func _make_player(team_home: bool, pos: Vector3, is_user := false) -> CharacterB
 	body.add_child(hair)
 	var eye_band := _mesh_box(body, Vector3(0.29, 0.045, 0.035), Vector3(0, 1.96, 0.245), trim_mat)
 	eye_band.cast_shadow = false
+	var limb_mat := _material(Color(0.055, 0.075, 0.12) if team_home else Color(0.16, 0.035, 0.045), 0.55)
+	var leg_nodes: Array[MeshInstance3D] = []
+	for leg_name in ["LeftLeg", "RightLeg"]:
+		var leg := MeshInstance3D.new()
+		var leg_mesh := BoxMesh.new()
+		leg_mesh.size = Vector3(0.19, 0.52, 0.22)
+		leg.mesh = leg_mesh
+		leg.name = leg_name
+		leg.position = Vector3(-0.17 if leg_name == "LeftLeg" else 0.17, 0.48, 0.0)
+		leg.material_override = limb_mat
+		body.add_child(leg)
+		leg_nodes.append(leg)
+	var arm_nodes: Array[MeshInstance3D] = []
+	for arm_name in ["LeftArm", "RightArm"]:
+		var arm := MeshInstance3D.new()
+		var arm_mesh := BoxMesh.new()
+		arm_mesh.size = Vector3(0.16, 0.5, 0.18)
+		arm.mesh = arm_mesh
+		arm.name = arm_name
+		arm.position = Vector3(-0.34 if arm_name == "LeftArm" else 0.34, 1.08, 0.0)
+		arm.material_override = limb_mat
+		body.add_child(arm)
+		arm_nodes.append(arm)
+	if is_user:
+		player_left_leg = leg_nodes[0]
+		player_right_leg = leg_nodes[1]
+		kick_anim_leg = player_right_leg
+		player_left_arm = arm_nodes[0]
+		player_right_arm = arm_nodes[1]
 	var boot_mat := _material(Color(0.05, 0.06, 0.08))
 	for z in [-0.22, 0.22]:
 		var boot := MeshInstance3D.new()
@@ -302,8 +360,10 @@ func _build_ball() -> void:
 	sphere.height = BALL_RADIUS * 2.0
 	var mesh := MeshInstance3D.new()
 	mesh.mesh = sphere
+	mesh.name = "AnimatedBallVisual"
 	mesh.material_override = _material(Color(0.95, 0.95, 0.9), 0.3)
 	ball.add_child(mesh)
+	ball_visual = mesh
 	var shape := CollisionShape3D.new()
 	var sphere_shape := SphereShape3D.new()
 	sphere_shape.radius = BALL_RADIUS
@@ -564,6 +624,7 @@ func _shoot() -> void:
 	if selected_ability == "Power Shot":
 		shot_power = 18.0
 	ball.apply_central_impulse(dir * shot_power)
+	kick_anim_time = 0.34
 	_play_sfx("kick")
 	_spawn_skill_burst(ball.global_position, Color(1.0, 0.25, 0.12))
 	ui_hint.text = "⚡ DIRECT SHOT! ⚡"
@@ -579,6 +640,7 @@ func _pass_ball() -> void:
 	if selected_ability == "Precision Pass":
 		pass_power = 11.0
 	ball.apply_central_impulse(dir.normalized() * pass_power)
+	kick_anim_time = 0.28
 	_play_sfx("pass")
 	_spawn_skill_burst(ball.global_position, Color(0.15, 0.65, 1.0))
 	ui_hint.text = "◆ PERFECT PASS ◆"
@@ -874,9 +936,9 @@ func _show_goal_celebration(message: String) -> void:
 	var home_goal := message.contains("BLUE")
 	goal_banner.text = "GOAL!!" if home_goal else "THEY SCORED!"
 	if home_goal:
-		goal_banner.text += "\n"THAT'S THE STRIKER'S INSTINCT!""
+		goal_banner.text += "\nTHAT'S THE STRIKER'S INSTINCT!"
 	else:
-		goal_banner.text += "\n"RESET. WE'RE NOT DONE YET.""
+		goal_banner.text += "\nRESET. WE'RE NOT DONE YET."
 	goal_banner.scale = Vector2(0.55, 0.55)
 	goal_banner.modulate.a = 1.0
 	goal_animation_busy = true
