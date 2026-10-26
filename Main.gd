@@ -71,6 +71,9 @@ func _process(delta: float) -> void:
 				wins_total += 1
 			player_level = 1 + int(wins_total / 3) + int(goals_total / 10)
 			_save_progress()
+			var stats := lobby_layer.find_child("ProgressStats", true, false) as Label
+			if stats:
+				stats.text = "LEVEL %d   •   WINS %d   •   GOALS %d" % [player_level, wins_total, goals_total]
 			ui_hint.text = "FULL TIME  •  Tap RESTART to play again"
 		_update_hud()
 	if burst_time > 0.0:
@@ -329,9 +332,17 @@ func _build_ui() -> void:
 	restart.anchor_right = 0.5
 	restart.anchor_top = 0.15
 	restart.anchor_bottom = 0.15
-	restart.position = Vector2(-65, 0)
+	restart.position = Vector2(-138, 0)
 	restart.size = Vector2(130, 44)
 	restart.pressed.connect(_restart)
+	var lobby_button := _make_button(layer, "LOBBY", Vector2.ZERO, Color(0.22,0.25,0.34))
+	lobby_button.anchor_left = 0.5
+	lobby_button.anchor_right = 0.5
+	lobby_button.anchor_top = 0.15
+	lobby_button.anchor_bottom = 0.15
+	lobby_button.position = Vector2(8, 0)
+	lobby_button.size = Vector2(112, 44)
+	lobby_button.pressed.connect(_return_to_lobby)
 	goal_flash = ColorRect.new()
 	goal_flash.anchor_right = 1.0
 	goal_flash.anchor_bottom = 1.0
@@ -502,6 +513,7 @@ func _burst() -> void:
 func _check_goals() -> void:
 	if ball.global_position.x > FIELD_LENGTH / 2.0 + 0.5 and absf(ball.global_position.z) < 3.1:
 		score_home += 1
+		goals_total += 1
 		_reset_kickoff("GOAL! BLUE TEAM SCORES")
 	elif ball.global_position.x < -FIELD_LENGTH / 2.0 - 0.5 and absf(ball.global_position.z) < 3.1:
 		score_away += 1
@@ -665,6 +677,11 @@ func _start_match() -> void:
 		_: tint = Color(0.08, 0.36, 0.95)
 	if player_visual:
 		player_visual.material_override = _material(tint, 0.45)
+		player_visual.scale = Vector3(1.0, 1.0, 1.0)
+		if selected_character == "Playmaker":
+			player_visual.scale = Vector3(0.92, 1.06, 0.92)
+		elif selected_character == "Defender":
+			player_visual.scale = Vector3(1.10, 1.0, 1.10)
 	match selected_character:
 		"Playmaker": ui_hint.text = "PLAYMAKER • PRECISION AND TEAMWORK"
 		"Defender": ui_hint.text = "DEFENDER • HOLD YOUR LINE"
@@ -678,6 +695,16 @@ func _start_match() -> void:
 	_reset_kickoff("KICK OFF! • " + selected_ability.to_upper())
 	lobby_layer.visible = false
 	_update_hud()
+
+
+func _return_to_lobby() -> void:
+	match_active = false
+	joystick_vector = Vector2.ZERO
+	lobby_layer.visible = true
+	lobby_status.text = "Choose your loadout and kick off."
+	var stats := lobby_layer.find_child("ProgressStats", true, false) as Label
+	if stats:
+		stats.text = "LEVEL %d   •   WINS %d   •   GOALS %d" % [player_level, wins_total, goals_total]
 
 
 func _show_online_room_status() -> void:
