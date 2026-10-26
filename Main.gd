@@ -431,6 +431,7 @@ func _build_ui() -> void:
 	goal_flash.color = Color(0.1, 0.9, 1.0, 0.0)
 	goal_flash.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(goal_flash)
+	goal_banner.move_to_front()
 
 func _panel_style(bg: Color, border_color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
