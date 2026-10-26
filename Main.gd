@@ -15,7 +15,7 @@ var all_bots: Array[CharacterBody3D] = []
 var score_home := 0
 var score_away := 0
 var time_left := MATCH_SECONDS
-var match_active := true
+var match_active := false
 var joystick_vector := Vector2.ZERO
 var touch_origin := Vector2.ZERO
 var joystick_touch_id := -1
@@ -37,6 +37,17 @@ var goal_flash: ColorRect
 var goal_flash_time := 0.0
 var burst_fx_timer := 0.0
 var run_phase := 0.0
+var lobby_layer: CanvasLayer
+var lobby_status: Label
+var character_picker: OptionButton
+var ability_picker: OptionButton
+var color_picker: OptionButton
+var selected_ability := "Speed Burst"
+var selected_character := "Striker"
+var selected_team_color := "Electric Blue"
+var wins_total := 0
+var goals_total := 0
+var player_level := 1
 
 func _ready() -> void:
 	rng.randomize()
@@ -47,6 +58,8 @@ func _ready() -> void:
 	_build_ball()
 	_build_camera()
 	_build_ui()
+	_load_progress()
+	_build_lobby()
 	_update_hud()
 
 func _process(delta: float) -> void:
@@ -54,6 +67,10 @@ func _process(delta: float) -> void:
 		time_left = maxf(0.0, time_left - delta)
 		if time_left <= 0.0:
 			match_active = false
+			if score_home > score_away:
+				wins_total += 1
+			player_level = 1 + int(wins_total / 3) + int(goals_total / 10)
+			_save_progress()
 			ui_hint.text = "FULL TIME  •  Tap RESTART to play again"
 		_update_hud()
 	if burst_time > 0.0:
@@ -448,7 +465,10 @@ func _shoot() -> void:
 		ui_hint.text = "Get closer to the ball to shoot"
 		return
 	var dir := Vector3(1, 0.15, 0) + Vector3(0, 0, -player.global_position.z * 0.02)
-	ball.apply_central_impulse(dir.normalized() * 13.0)
+	var shot_power := 13.0
+	if selected_ability == "Power Shot":
+		shot_power = 18.0
+	ball.apply_central_impulse(dir.normalized() * shot_power)
 	_spawn_skill_burst(ball.global_position, Color(1.0, 0.25, 0.12))
 	ui_hint.text = "⚡ POWER SHOT! ⚡"
 
@@ -459,11 +479,17 @@ func _pass_ball() -> void:
 	var target := teammates[0].global_position if not teammates.is_empty() else player.global_position + Vector3(5,0,0)
 	var dir := (target - ball.global_position).normalized()
 	dir.y = 0.05
-	ball.apply_central_impulse(dir.normalized() * 7.5)
+	var pass_power := 7.5
+	if selected_ability == "Precision Pass":
+		pass_power = 11.0
+	ball.apply_central_impulse(dir.normalized() * pass_power)
 	_spawn_skill_burst(ball.global_position, Color(0.15, 0.65, 1.0))
 	ui_hint.text = "◆ PERFECT PASS ◆"
 
 func _burst() -> void:
+	if selected_ability != "Speed Burst":
+		ui_hint.text = "POWER SHOT selected — use SHOOT" if selected_ability == "Power Shot" else "PRECISION PASS selected — use PASS"
+		return
 	if burst_cooldown > 0.0:
 		ui_hint.text = "BURST recharging..."
 		return
@@ -521,7 +547,157 @@ func _update_hud() -> void:
 	var total := int(ceil(time_left))
 	ui_timer.text = "   %02d:%02d" % [total / 60, total % 60]
 	if burst_button:
-		burst_button.text = "BURST" if burst_cooldown <= 0.0 else str(int(ceil(burst_cooldown))) + "s"
+		if selected_ability == "Speed Burst":
+			burst_button.text = "BURST" if burst_cooldown <= 0.0 else str(int(ceil(burst_cooldown))) + "s"
+		else:
+			burst_button.text = "SKILL"
+
+
+func _build_lobby() -> void:
+	lobby_layer = CanvasLayer.new()
+	lobby_layer.layer = 10
+	add_child(lobby_layer)
+	var backdrop := ColorRect.new()
+	backdrop.anchor_right = 1.0
+	backdrop.anchor_bottom = 1.0
+	backdrop.color = Color(0.015, 0.025, 0.065, 0.96)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	lobby_layer.add_child(backdrop)
+	var center := CenterContainer.new()
+	center.anchor_right = 1.0
+	center.anchor_bottom = 1.0
+	center.offset_left = 18
+	center.offset_right = -18
+	center.offset_top = 10
+	center.offset_bottom = -10
+	lobby_layer.add_child(center)
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(320, 500)
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.035, 0.07, 0.14, 0.98)
+	panel_style.border_color = Color(0.1, 0.75, 1.0, 0.9)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(22)
+	panel.add_theme_stylebox_override("panel", panel_style)
+	center.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 18)
+	margin.add_theme_constant_override("margin_right", 18)
+	margin.add_theme_constant_override("margin_top", 14)
+	margin.add_theme_constant_override("margin_bottom", 14)
+	panel.add_child(margin)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 7)
+	margin.add_child(stack)
+	var title := Label.new()
+	title.text = "FREESTYLE ARENA"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.add_theme_font_size_override("font_size", 27)
+	title.add_theme_color_override("font_color", Color(0.25, 0.82, 1.0))
+	stack.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = "ANIME FOOTBALL • 4v4"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	subtitle.add_theme_font_size_override("font_size", 13)
+	subtitle.add_theme_color_override("font_color", Color(0.8, 0.88, 1.0))
+	stack.add_child(subtitle)
+	stack.add_child(_lobby_label("CHARACTER"))
+	character_picker = OptionButton.new()
+	for item in ["Striker", "Playmaker", "Defender"]:
+		character_picker.add_item(item)
+	stack.add_child(character_picker)
+	stack.add_child(_lobby_label("SPECIAL ABILITY"))
+	ability_picker = OptionButton.new()
+	for item in ["Speed Burst", "Power Shot", "Precision Pass"]:
+		ability_picker.add_item(item)
+	stack.add_child(ability_picker)
+	stack.add_child(_lobby_label("TEAM KIT"))
+	color_picker = OptionButton.new()
+	for item in ["Electric Blue", "Neon Green", "Royal Purple", "Crimson Red"]:
+		color_picker.add_item(item)
+	stack.add_child(color_picker)
+	var stats := Label.new()
+	stats.name = "ProgressStats"
+	stats.text = "LEVEL %d   •   WINS %d   •   GOALS %d" % [player_level, wins_total, goals_total]
+	stats.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stats.add_theme_color_override("font_color", Color(1.0, 0.82, 0.3))
+	stats.add_theme_font_size_override("font_size", 14)
+	stack.add_child(stats)
+	var play := Button.new()
+	play.text = "▶  PLAY MATCH"
+	play.custom_minimum_size.y = 46
+	play.add_theme_font_size_override("font_size", 18)
+	play.add_theme_color_override("font_color", Color.WHITE)
+	play.add_theme_stylebox_override("normal", _panel_style(Color(0.03, 0.42, 0.78), Color(0.25, 0.82, 1.0)))
+	play.pressed.connect(_start_match)
+	stack.add_child(play)
+	var room := Button.new()
+	room.text = "FRIENDS ROOM / ONLINE"
+	room.custom_minimum_size.y = 38
+	room.pressed.connect(_show_online_room_status)
+	stack.add_child(room)
+	lobby_status = Label.new()
+	lobby_status.text = "Choose your loadout and kick off."
+	lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	lobby_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lobby_status.add_theme_font_size_override("font_size", 12)
+	lobby_status.add_theme_color_override("font_color", Color(0.7, 0.8, 0.9))
+	stack.add_child(lobby_status)
+
+
+func _lobby_label(value: String) -> Label:
+	var label := Label.new()
+	label.text = value
+	label.add_theme_font_size_override("font_size", 12)
+	label.add_theme_color_override("font_color", Color(0.45, 0.75, 0.95))
+	return label
+
+
+func _start_match() -> void:
+	selected_character = character_picker.get_item_text(character_picker.selected)
+	selected_ability = ability_picker.get_item_text(ability_picker.selected)
+	selected_team_color = color_picker.get_item_text(color_picker.selected)
+	var tint := Color(0.08, 0.36, 0.95)
+	match selected_team_color:
+		"Neon Green": tint = Color(0.12, 0.92, 0.42)
+		"Royal Purple": tint = Color(0.52, 0.2, 0.92)
+		"Crimson Red": tint = Color(0.92, 0.08, 0.2)
+		_: tint = Color(0.08, 0.36, 0.95)
+	if player_visual:
+		player_visual.material_override = _material(tint, 0.45)
+	match selected_character:
+		"Playmaker": ui_hint.text = "PLAYMAKER • PRECISION AND TEAMWORK"
+		"Defender": ui_hint.text = "DEFENDER • HOLD YOUR LINE"
+		_: ui_hint.text = "STRIKER • GO FOR GOALS"
+	match_active = true
+	time_left = MATCH_SECONDS
+	score_home = 0
+	score_away = 0
+	burst_time = 0.0
+	burst_cooldown = 0.0
+	_reset_kickoff("KICK OFF! • " + selected_ability.to_upper())
+	lobby_layer.visible = false
+	_update_hud()
+
+
+func _show_online_room_status() -> void:
+	lobby_status.text = "Online friend rooms are not connected yet. This build currently supports offline 4v4 vs AI; online play needs a multiplayer server."
+
+
+func _save_progress() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("career", "wins", wins_total)
+	cfg.set_value("career", "goals", goals_total)
+	cfg.set_value("career", "level", player_level)
+	cfg.save("user://football_progress.cfg")
+
+
+func _load_progress() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load("user://football_progress.cfg") == OK:
+		wins_total = int(cfg.get_value("career", "wins", 0))
+		goals_total = int(cfg.get_value("career", "goals", 0))
+		player_level = int(cfg.get_value("career", "level", 1))
 
 
 func _spawn_skill_burst(at: Vector3, tint: Color) -> void:
