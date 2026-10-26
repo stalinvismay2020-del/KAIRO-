@@ -43,9 +43,14 @@ jobs:
 
       - name: Install Android build template
         run: |
-          Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --install-android-build-template
+          set -eux
+          TEMPLATE="$HOME/.local/share/godot/export_templates/4.3.stable/android_source.zip"
+          test -f "$TEMPLATE"
+          mkdir -p android
+          unzip -q -o "$TEMPLATE" -d android
           echo "Checking project Android build template..."
-          test -f android/build/build.gradle || (echo "Android build template was not installed into the project." && find android -maxdepth 3 -type f -print 2>/dev/null || true; exit 1)
+          find android -maxdepth 3 -type f | head -80
+          test -f android/build.gradle
 
       - name: Verify project parses
         run: Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --quit
