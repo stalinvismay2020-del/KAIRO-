@@ -170,9 +170,33 @@ func _build_pitch() -> void:
 	_mesh_box(self, Vector3(FIELD_LENGTH + 2, 0.6, 0.45), Vector3(0, 0.1, -FIELD_WIDTH / 2.0 - 0.45), dark)
 	_mesh_box(self, Vector3(FIELD_LENGTH + 2, 0.6, 0.45), Vector3(0, 0.1, FIELD_WIDTH / 2.0 + 0.45), dark)
 	for side in [-1.0, 1.0]:
-		for tier in range(3):
-			var seat_mat := _material([Color(0.09,0.15,0.23), Color(0.12,0.20,0.29), Color(0.16,0.24,0.34)][tier])
-			_mesh_box(self, Vector3(FIELD_LENGTH + 8, 0.55, 1.5), Vector3(0, 0.25 + tier * 0.55, side * (FIELD_WIDTH / 2.0 + 2.0 + tier * 1.1)), seat_mat)
+		for tier in range(5):
+			var seat_mat := _material([Color(0.045,0.075,0.13), Color(0.065,0.11,0.19), Color(0.09,0.15,0.25), Color(0.12,0.19,0.3), Color(0.15,0.23,0.35)][tier])
+			_mesh_box(self, Vector3(FIELD_LENGTH + 10, 0.48, 1.25), Vector3(0, 0.25 + tier * 0.48, side * (FIELD_WIDTH / 2.0 + 1.8 + tier * 0.92)), seat_mat)
+	# Proper penalty areas, six-yard boxes and penalty spots.
+	for end in [-1.0, 1.0]:
+		var box_x := end * (FIELD_LENGTH / 2.0 - 4.0)
+		_mesh_box(self, Vector3(0.07, 0.025, 15.0), Vector3(box_x, -0.018, 0), white)
+		_mesh_box(self, Vector3(6.0, 0.025, 0.07), Vector3(end * (FIELD_LENGTH / 2.0 - 7.0), -0.018, -7.5), white)
+		_mesh_box(self, Vector3(6.0, 0.025, 0.07), Vector3(end * (FIELD_LENGTH / 2.0 - 7.0), -0.018, 7.5), white)
+		_mesh_box(self, Vector3(0.07, 0.025, 7.0), Vector3(end * (FIELD_LENGTH / 2.0 - 1.0), -0.018, 0), white)
+		_mesh_box(self, Vector3(0.07, 0.025, 0.07), Vector3(end * (FIELD_LENGTH / 2.0 - 7.0), -0.005, 0), white)
+	# Stadium fascia and subtle anime-arena cyan lighting.
+	var fascia := _material(Color(0.025, 0.045, 0.085))
+	_mesh_box(self, Vector3(FIELD_LENGTH + 14, 0.45, 0.7), Vector3(0, 2.65, -FIELD_WIDTH / 2.0 - 5.1), fascia)
+	_mesh_box(self, Vector3(FIELD_LENGTH + 14, 0.45, 0.7), Vector3(0, 2.65, FIELD_WIDTH / 2.0 + 5.1), fascia)
+	var glow := _material(Color(0.05, 0.55, 0.95))
+	glow.emission_enabled = true
+	glow.emission = Color(0.04, 0.38, 1.0)
+	glow.emission_energy_multiplier = 1.3
+	_mesh_box(self, Vector3(FIELD_LENGTH + 12, 0.07, 0.08), Vector3(0, 2.4, -FIELD_WIDTH / 2.0 - 5.0), glow)
+	_mesh_box(self, Vector3(FIELD_LENGTH + 12, 0.07, 0.08), Vector3(0, 2.4, FIELD_WIDTH / 2.0 + 5.0), glow)
+	# Floodlight towers around the pitch.
+	for x in [-FIELD_LENGTH / 2.0 - 5.0, FIELD_LENGTH / 2.0 + 5.0]:
+		for z in [-FIELD_WIDTH / 2.0 - 6.0, FIELD_WIDTH / 2.0 + 6.0]:
+			_mesh_box(self, Vector3(0.22, 8.0, 0.22), Vector3(x, 4.0, z), _material(Color(0.12, 0.16, 0.23), 0.35))
+			var lamp := _mesh_box(self, Vector3(1.6, 0.22, 0.65), Vector3(x, 8.0, z), glow)
+			lamp.cast_shadow = false
 
 func _build_goals() -> void:
 	var goal_mat := _material(Color(0.93, 0.96, 1.0), 0.4)
@@ -181,6 +205,12 @@ func _build_goals() -> void:
 		_mesh_box(self, Vector3(0.18, 2.3, 0.18), Vector3(x, 1.1, -3.1), goal_mat)
 		_mesh_box(self, Vector3(0.18, 2.3, 0.18), Vector3(x, 1.1, 3.1), goal_mat)
 		_mesh_box(self, Vector3(0.18, 0.18, 6.4), Vector3(x, 2.2, 0), goal_mat)
+		var net_mat := _material(Color(0.55, 0.76, 0.9, 0.28), 0.95)
+		# Fine net grid, rather than a solid translucent panel.
+		for zline in range(13):
+			_mesh_box(self, Vector3(1.55, 0.025, 0.025), Vector3(x + (0.78 if x < 0 else -0.78), 0.2 + zline * 0.16, -3.0 + zline * 0.5), net_mat)
+		for hline in range(8):
+			_mesh_box(self, Vector3(1.55, 0.025, 0.025), Vector3(x + (0.78 if x < 0 else -0.78), 0.18 + hline * 0.28, 0), net_mat)
 		_mesh_box(self, Vector3(1.8, 0.08, 6.3), Vector3(x + (0.9 if x < 0 else -0.9), 0.12, 0), _material(Color(0.75, 0.85, 0.9, 0.25)))
 
 func _make_player(team_home: bool, pos: Vector3, is_user := false) -> CharacterBody3D:
@@ -198,6 +228,9 @@ func _make_player(team_home: bool, pos: Vector3, is_user := false) -> CharacterB
 	body.add_child(mesh)
 	if is_user:
 		player_visual = mesh
+	# Anime-inspired athletic silhouette: defined torso, hair silhouette and bright eye band.
+	var trim_mat := _material(Color(0.12, 0.86, 1.0) if team_home else Color(1.0, 0.36, 0.18), 0.35)
+	_mesh_box(body, Vector3(0.56, 0.09, 0.46), Vector3(0, 1.12, 0), trim_mat)
 	var head := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
 	sphere.radius = 0.27
@@ -206,6 +239,16 @@ func _make_player(team_home: bool, pos: Vector3, is_user := false) -> CharacterB
 	head.position = Vector3(0, 1.9, 0)
 	head.material_override = _material(Color(0.72, 0.48, 0.32))
 	body.add_child(head)
+	var hair := MeshInstance3D.new()
+	var hair_mesh := SphereMesh.new()
+	hair_mesh.radius = 0.29
+	hair_mesh.height = 0.28
+	hair.mesh = hair_mesh
+	hair.position = Vector3(0, 2.13, -0.015)
+	hair.material_override = _material(Color(0.035, 0.045, 0.075) if team_home else Color(0.16, 0.035, 0.045), 0.4)
+	body.add_child(hair)
+	var eye_band := _mesh_box(body, Vector3(0.29, 0.045, 0.035), Vector3(0, 1.96, 0.245), trim_mat)
+	eye_band.cast_shadow = false
 	var boot_mat := _material(Color(0.05, 0.06, 0.08))
 	for z in [-0.22, 0.22]:
 		var boot := MeshInstance3D.new()
