@@ -51,16 +51,14 @@ jobs:
           chmod +x "$HOME/godot/Godot_v4.3-stable_linux.x86_64"
           echo "$HOME/godot" >> "$GITHUB_PATH"
 
-      - name: Install Android build template
+      - name: Verify Android export templates
         run: |
           set -eux
-          TEMPLATE="$HOME/.local/share/godot/export_templates/4.3.stable/android_source.zip"
-          test -f "$TEMPLATE"
-          mkdir -p android/build
-          unzip -q -o "$TEMPLATE" -d android/build
-          echo "Checking project Android build template..."
-          find android -maxdepth 3 -type f | head -80
-          test -f android/build/build.gradle
+          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/4.3.stable"
+          test -f "$TEMPLATE_DIR/android_debug.apk"
+          test -f "$TEMPLATE_DIR/android_release.apk"
+          test -f "$TEMPLATE_DIR/android_source.zip"
+          rm -rf android/build
 
       - name: Verify project parses
         run: Godot_v4.3-stable_linux.x86_64 --headless --editor --path . --quit
