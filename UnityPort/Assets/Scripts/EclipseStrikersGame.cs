@@ -11,6 +11,7 @@ public class EclipseStrikersGame : MonoBehaviour
     Rigidbody ballBody;
     Transform userPlayer;
     Camera gameCamera;
+    EclipseStrikersCutscenes cutscenes;
     float timeLeft = MatchLength;
     int blueScore, redScore;
     bool matchEnded;
@@ -37,11 +38,14 @@ public class EclipseStrikersGame : MonoBehaviour
         BuildPlayers();
         BuildCamera();
         BuildLighting();
+        cutscenes = gameObject.AddComponent<EclipseStrikersCutscenes>();
+        cutscenes.Initialize(gameCamera, userPlayer);
     }
 
     void Update()
     {
         if (matchEnded) return;
+        if (cutscenes != null && cutscenes.Tick(Time.deltaTime)) return;
         timeLeft -= Time.deltaTime;
         if (timeLeft <= 0f) { timeLeft = 0f; matchEnded = true; }
 
@@ -271,8 +275,8 @@ public class EclipseStrikersGame : MonoBehaviour
         Vector3 p = ball.transform.position;
         if (Mathf.Abs(p.x) < 3f && p.y < 2.4f)
         {
-            if (p.z > 18f) { blueScore++; ResetKickoff(); }
-            else if (p.z < -18f) { redScore++; ResetKickoff(); }
+            if (p.z > 18f) { blueScore++; ResetKickoff(); if (cutscenes != null) cutscenes.PlayGoal(); }
+            else if (p.z < -18f) { redScore++; ResetKickoff(); if (cutscenes != null) cutscenes.PlayGoal(); }
         }
         if (Mathf.Abs(p.x) > 12f || Mathf.Abs(p.z) > 21f || p.y < -4f) ResetBall();
     }
